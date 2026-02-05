@@ -1,27 +1,26 @@
 import fs from "fs";
-import path from "path";
 import { chromium } from "playwright";
 
 const SNAPSHOT_FILE = "imax_snapshot.json";
+const URL = "https://www.todoshowcase.com/";
 
 async function getIMAXMovies() {
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
 
-  await page.goto("https://www.todoshowcase.com/", {
-    waitUntil: "networkidle",
-  });
+  await page.goto(URL, { waitUntil: "networkidle" });
 
   const movies = await page.evaluate(() => {
     const results = [];
     const films = document.querySelectorAll(".boxfilm");
 
     films.forEach(film => {
-      const isIMAX = film.querySelector(".tresd p")?.innerText.trim() === "IMAX";
-      if (!isIMAX) return;
+      const imaxTag = film.querySelector(".tresd p");
+      if (!imaxTag) return;
+      if (imaxTag.innerText.trim() !== "IMAX") return;
 
-      const title =
-        film.querySelector(".titulo-pelicula h2 a")?.innerText.trim();
+      const titleEl = film.querySelector(".titulo-pelicula h2 a");
+      const title = titleEl ? titleEl.innerText.trim() : null;
 
       if (title) {
         results.push({ title });
@@ -35,13 +34,15 @@ async function getIMAXMovies() {
   return movies;
 }
 
-function loadPreviousSnapshot() {
-  if (!fs.existsSync(SNAPSHOT_FILE)) return [];
+function loadSnapshot() {
+  if (!fs.existsSync(SNAPSHOT_FILE)) {
+    return [];
+  }
   return JSON.parse(fs.readFileSync(SNAPSHOT_FILE, "utf-8"));
 }
 
-function saveSnapshot(movies) {
-  fs.writeFileSync(SNAPSHOT_FILE, JSON.stringify(movies, null, 2));
+function saveSnapshot(titles) {
+  fs.writeFileSync(SNAPSHOT_FILE, JSON.stringify(titles, null, 2));
 }
 
 function diffMovies(today, yesterday) {
@@ -51,12 +52,32 @@ function diffMovies(today, yesterday) {
 }
 
 async function main() {
-  // 1️⃣ scrapeamos
+  // 1️⃣ Scrape
   const imaxMovies = await getIMAXMovies();
 
-  // 2️⃣ normalizamos
-  const todayMovies = imaxMovies.map(m => m.title).sort();
-  const yesterdayMovies = loadPreviousSnapshot();
+  // 2️⃣ Normalizar
+  const todayTitles = imaxMovies.map(m => m.title).sort();
+  const yesterdayTitles = loadSnapshot();
 
-  // 3️⃣ comparamos
-  const { added, removed } = diffMovies(todayMovies, yesterdayMovies);
+  // 3️⃣ Comparar
+  const { added, removed } = diffMovies(todayTitles, yesterdayTitles);
+
+  console.log("🎬 Películas IMAX hoy:");
+  todayTitles.forEach(t => console.log(" -", t));
+
+  if (added.length || removed.length) {
+    console.log("🆕 Agregadas:", added);
+    console.log("❌ Quitadas:", removed);
+  } else {
+    console.log("Sin cambios respecto al día anterior");
+  }
+
+  // 4️⃣ Guardar snapshot
+  saveSnapshot(todayTitles);
+}
+
+// 🚀 Ejecutar
+main().catch(err => {
+  console.error("❌ Error en scraper:", err);
+  process.exit(1);
+});
