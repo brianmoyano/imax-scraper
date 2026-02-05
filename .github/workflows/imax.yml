@@ -1,0 +1,36 @@
+name: IMAX Showcase Bot
+
+on:
+  schedule:
+    - cron: "0 11 * * *"   # todos los días 11:00 UTC (~8 AM ARG)
+  workflow_dispatch:       # permite correrlo a mano
+
+jobs:
+  run-scraper:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Run IMAX scraper
+        run: node scrape-imax.js
+
+      - name: Commit snapshot if changed
+        run: |
+          git config user.name "imax-bot"
+          git config user.email "imax-bot@users.noreply.github.com"
+          git add imax_snapshot.json
+          git diff --cached --quiet || git commit -m "Update IMAX snapshot"
+          git push
