@@ -4,6 +4,27 @@ const path = require('path');
 
 const SNAPSHOT_PATH = path.join(__dirname, 'imax_snapshot.json');
 
+const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+
+async function sendTelegramMessage(text) {
+  if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) {
+    console.log('⚠️ Telegram no configurado, se omite envío');
+    return;
+  }
+
+  await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: TELEGRAM_CHAT_ID,
+      text,
+      parse_mode: 'HTML',
+      disable_web_page_preview: true,
+    }),
+  });
+}
+
 (async () => {
   console.log('🎬 Ejecutando scraper IMAX Showcase');
 
@@ -38,10 +59,7 @@ const SNAPSHOT_PATH = path.join(__dirname, 'imax_snapshot.json');
       const filmId = match[1];
 
       if (!map.has(filmId)) {
-        map.set(filmId, {
-          filmId,
-          title,
-        });
+        map.set(filmId, { filmId, title });
       }
     });
 
@@ -50,50 +68,51 @@ const SNAPSHOT_PATH = path.join(__dirname, 'imax_snapshot.json');
 
   await browser.close();
 
-  // 2️⃣ Leer snapshot anterior
+  // 2️⃣ Snapshot anterior
   let previousMovies = [];
   if (fs.existsSync(SNAPSHOT_PATH)) {
-    previousMovies = JSON.parse(
-      fs.readFileSync(SNAPSHOT_PATH, 'utf-8')
-    );
+    previousMovies = JSON.parse(fs.readFileSync(SNAPSHOT_PATH, 'utf-8'));
   }
 
-  // Convertimos a sets de filmId
   const prevIds = new Set(previousMovies.map(m => m.filmId));
   const currIds = new Set(currentMovies.map(m => m.filmId));
 
-  // 3️⃣ Detectar cambios
   const added = currentMovies.filter(m => !prevIds.has(m.filmId));
   const removed = previousMovies.filter(m => !currIds.has(m.filmId));
 
-  // 4️⃣ Output
-  console.log('\n📌 Resumen de cambios IMAX');
+  // 3️⃣ Armar mensaje
+  let message = `🎬 <b>IMAX Showcase</b>\n`;
 
   if (added.length === 0 && removed.length === 0) {
-    console.log('➡️  No hubo cambios desde la última ejecución');
+    message += `\n➡️ Sin cambios desde ayer\n`;
   } else {
     if (added.length > 0) {
-      console.log('\n🟢 Películas agregadas:');
-      added.forEach(m => console.log(`+ ${m.title}`));
+      message += `\n🟢 <b>Agregadas:</b>\n`;
+      added.forEach(m => (message += `+ ${m.title}\n`));
     }
 
     if (removed.length > 0) {
-      console.log('\n🔴 Películas removidas:');
-      removed.forEach(m => console.log(`- ${m.title}`));
+      message += `\n🔴 <b>Removidas:</b>\n`;
+      removed.forEach(m => (message += `- ${m.title}\n`));
     }
   }
 
-  // 5️⃣ Listado completo actual
-  console.log('\n🎥 Cartelera IMAX actual:');
-  currentMovies.forEach(m => {
-    console.log(`• ${m.title}`);
-  });
+  message += `\n🎥 <b>Cartelera IMAX actual:</b>\n`;
+  currentMovies.forEach(m => (message += `• ${m.title}\n`));
 
-  // 6️⃣ Guardar snapshot nuevo
+  // 4️⃣ Enviar Telegram
+  await sendTelegramMessage(message);
+
+  // 5️⃣ Guardar snapshot
   fs.writeFileSync(
     SNAPSHOT_PATH,
     JSON.stringify(currentMovies, null, 2)
   );
 
-  console.log('\n💾 Snapshot actualizado');
+  console.log('📨 Mensaje enviado a Telegram');
 })();
+
+console.log("ENV CHECK", {
+  hasBotToken: !!process.env.TELEGRAM_BOT_TOKEN,
+  hasChatId: !!process.env.TELEGRAM_CHAT_ID
+});
