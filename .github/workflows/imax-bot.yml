@@ -23,7 +23,7 @@ jobs:
         run: npx playwright install --with-deps
 
       - name: Run IMAX scraper
-        run: node scrape-imax.js
+        run: node scrape-imax.mjs
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
