@@ -24,7 +24,9 @@ const SHOWCASE_URL = "https://www.todoshowcase.com/";
 function uniqByTitle(movies) {
   const map = new Map();
   for (const m of movies) {
-    map.set(m.title, m);
+    // Normalizar el título (trim + eliminar espacios múltiples)
+    const normalizedTitle = m.title.trim().replace(/\s+/g, ' ');
+    map.set(normalizedTitle, m);
   }
   return [...map.values()];
 }
