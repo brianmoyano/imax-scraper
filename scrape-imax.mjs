@@ -1,4 +1,5 @@
 import fs from "fs";
+import { chromium } from "playwright";
 
 // =====================
 // ENV
@@ -15,7 +16,7 @@ if (!BOT_TOKEN || !CHAT_ID) {
 // CONFIG
 // =====================
 const SNAPSHOT_FILE = "imax_snapshot.json";
-const IMAX_URL = "https://www.cinemarkhoyts.com.ar/cartelera/imax";
+const SHOWCASE_URL = "https://www.todoshowcase.com/";
 
 // =====================
 // HELPERS
@@ -53,20 +54,53 @@ async function sendTelegramMessage(text) {
 }
 
 // =====================
-// SCRAPER (mock simple)
+// SCRAPER
 // =====================
-// ⛔️ ACÁ normalmente iría Playwright
-// ⛔️ dejo mockeado para que el flujo sea claro
-const imaxMovies = [
-  { filmId: "1", title: "Avatar: fuego y cenizas" },
-  { filmId: "2", title: "Cumbres borrascosas" },
-  { filmId: "3", title: "Pecadores" },
-];
+async function scrapeImaxMovies() {
+  console.log("🌐 Abriendo Playwright...");
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage();
+
+  console.log("📡 Cargando Showcase...");
+  await page.goto(SHOWCASE_URL, { waitUntil: "networkidle" });
+
+  console.log("🔍 Buscando películas IMAX...");
+  
+  // Buscar todos los .boxfilm que tengan el tag IMAX
+  const imaxMovies = await page.$$eval(".boxfilm", (boxes) => {
+    return boxes
+      .filter((box) => {
+        // Verificar si tiene el div .tresd con texto "IMAX"
+        const imaxTag = box.querySelector(".tresd p");
+        return imaxTag && imaxTag.textContent.trim() === "IMAX";
+      })
+      .map((box) => {
+        // Extraer título
+        const titleElement = box.querySelector(".titulo-pelicula h2 a");
+        const title = titleElement ? titleElement.textContent.trim() : "Sin título";
+
+        // Extraer filmId del href
+        const link = box.querySelector(".afiche-pelicula a");
+        const href = link ? link.getAttribute("href") : "";
+        const match = href.match(/filmid=(\d+)/);
+        const filmId = match ? match[1] : "unknown";
+
+        return { filmId, title };
+      });
+  });
+
+  await browser.close();
+  console.log(`✅ Encontradas ${imaxMovies.length} películas IMAX`);
+  
+  return imaxMovies;
+}
 
 // =====================
 // MAIN
 // =====================
 (async () => {
+  const imaxMovies = await scrapeImaxMovies();
+
   console.log("🎬 Películas IMAX hoy:");
   imaxMovies.forEach(m => console.log(" -", m.title));
 
@@ -97,7 +131,7 @@ const imaxMovies = [
     return;
   }
 
-  let message = "🎬 *Cambios en IMAX*\n\n";
+  let message = "🎬 *Cambios en IMAX - Showcase*\n\n";
 
   if (added.length) {
     message += "🆕 *Agregadas:*\n";
@@ -114,6 +148,6 @@ const imaxMovies = [
     });
   }
 
-  console.log("🚀 Voy a mandar Telegram");
+  console.log("🚀 Enviando notificación...");
   await sendTelegramMessage(message);
 })();
