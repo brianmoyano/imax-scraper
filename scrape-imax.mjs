@@ -24,9 +24,12 @@ const SHOWCASE_URL = "https://www.todoshowcase.com/";
 function uniqByTitle(movies) {
   const map = new Map();
   for (const m of movies) {
-    // Normalizar el título (trim + eliminar espacios múltiples)
-    const normalizedTitle = m.title.trim().replace(/\s+/g, ' ');
-    map.set(normalizedTitle, m);
+    // Normalizar: trim + eliminar espacios dobles + lowercase para comparar
+    const normalizedTitle = m.title.trim().replace(/\s+/g, ' ').toLowerCase();
+    // Guardar con el título original (no normalizado) para display
+    if (!map.has(normalizedTitle)) {
+      map.set(normalizedTitle, m);
+    }
   }
   return [...map.values()];
 }
@@ -68,20 +71,16 @@ async function scrapeImaxMovies() {
 
   console.log("🔍 Buscando películas IMAX...");
   
-  // Buscar todos los .boxfilm que tengan el tag IMAX
   const imaxMovies = await page.$$eval(".boxfilm", (boxes) => {
     return boxes
       .filter((box) => {
-        // Verificar si tiene el div .tresd con texto "IMAX"
         const imaxTag = box.querySelector(".tresd p");
         return imaxTag && imaxTag.textContent.trim() === "IMAX";
       })
       .map((box) => {
-        // Extraer título
         const titleElement = box.querySelector(".titulo-pelicula h2 a");
         const title = titleElement ? titleElement.textContent.trim() : "Sin título";
 
-        // Extraer filmId del href
         const link = box.querySelector(".afiche-pelicula a");
         const href = link ? link.getAttribute("href") : "";
         const match = href.match(/filmid=(\d+)/);
@@ -93,6 +92,9 @@ async function scrapeImaxMovies() {
 
   await browser.close();
   console.log(`✅ Encontradas ${imaxMovies.length} películas IMAX`);
+  
+  console.log("🔍 Detalle de filmIds encontrados:");
+  imaxMovies.forEach(m => console.log(`  ${m.filmId} - ${m.title}`));
   
   return imaxMovies;
 }
@@ -107,11 +109,20 @@ async function scrapeImaxMovies() {
   imaxMovies.forEach(m => console.log(" -", m.title));
 
   const todayMovies = uniqByTitle(imaxMovies);
+  
+  console.log(`\n📊 Después de deduplicar: ${todayMovies.length} películas únicas`);
+  todayMovies.forEach(m => console.log(` - ${m.filmId}: ${m.title}`));
 
   let previousMovies = [];
   if (fs.existsSync(SNAPSHOT_FILE)) {
     previousMovies = JSON.parse(fs.readFileSync(SNAPSHOT_FILE, "utf8"));
+    console.log(`\n📂 Snapshot encontrado con ${previousMovies.length} películas`);
+    console.log("Previous IDs:", previousMovies.map(m => m.filmId));
+  } else {
+    console.log("\n⚠️ No se encontró snapshot anterior");
   }
+
+  console.log("Today IDs:", todayMovies.map(m => m.filmId));
 
   const prevIds = new Set(previousMovies.map(m => m.filmId));
   const todayIds = new Set(todayMovies.map(m => m.filmId));
@@ -119,7 +130,7 @@ async function scrapeImaxMovies() {
   const added = todayMovies.filter(m => !prevIds.has(m.filmId));
   const removed = previousMovies.filter(m => !todayIds.has(m.filmId));
 
-  console.log("🆕 Agregadas:", added.map(m => m.title));
+  console.log("\n🆕 Agregadas:", added.map(m => m.title));
   console.log("❌ Quitadas:", removed.map(m => m.title));
 
   // Guardar snapshot nuevo
