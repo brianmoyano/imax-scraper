@@ -5,13 +5,6 @@ on:
     - cron: "0 11 * * *"   # todos los días 11:00 UTC (~8 AM ARG)
   workflow_dispatch:
 
-permissions:
-  contents: write
-
-concurrency:
-  group: imax-scraper
-  cancel-in-progress: true   # 👈 CLAVE ABSOLUTA
-
 jobs:
   run-scraper:
     runs-on: ubuntu-latest
@@ -19,9 +12,6 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          persist-credentials: true
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -34,17 +24,19 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps
 
+      # 👉 Restaurar snapshot anterior
+      - name: Restore IMAX snapshot from cache
+        uses: actions/cache@v4
+        with:
+          path: imax_snapshot.json
+          key: imax-snapshot-latest
+
       - name: Run IMAX scraper
         run: node scrape-imax.js
 
-      - name: Commit snapshot if changed
-        run: |
-          git config user.name "imax-bot"
-          git config user.email "imax-bot@users.noreply.github.com"
-
-          git pull --rebase origin main
-
-          git add imax_snapshot.json
-          git diff --cached --quiet || git commit -m "Update IMAX snapshot"
-
-          git push origin main
+      # 👉 Guardar snapshot actual para mañana
+      - name: Save IMAX snapshot to cache
+        uses: actions/cache@v4
+        with:
+          path: imax_snapshot.json
+          key: imax-snapshot-latest
