@@ -24,9 +24,7 @@ const SHOWCASE_URL = "https://www.todoshowcase.com/";
 function uniqByTitle(movies) {
   const map = new Map();
   for (const m of movies) {
-    // Normalizar: trim + eliminar espacios dobles + lowercase para comparar
     const normalizedTitle = m.title.trim().replace(/\s+/g, ' ').toLowerCase();
-    // Guardar con el título original (no normalizado) para display
     if (!map.has(normalizedTitle)) {
       map.set(normalizedTitle, m);
     }
@@ -93,9 +91,6 @@ async function scrapeImaxMovies() {
   await browser.close();
   console.log(`✅ Encontradas ${imaxMovies.length} películas IMAX`);
   
-  console.log("🔍 Detalle de filmIds encontrados:");
-  imaxMovies.forEach(m => console.log(`  ${m.filmId} - ${m.title}`));
-  
   return imaxMovies;
 }
 
@@ -109,20 +104,15 @@ async function scrapeImaxMovies() {
   imaxMovies.forEach(m => console.log(" -", m.title));
 
   const todayMovies = uniqByTitle(imaxMovies);
-  
   console.log(`\n📊 Después de deduplicar: ${todayMovies.length} películas únicas`);
-  todayMovies.forEach(m => console.log(` - ${m.filmId}: ${m.title}`));
 
   let previousMovies = [];
   if (fs.existsSync(SNAPSHOT_FILE)) {
     previousMovies = JSON.parse(fs.readFileSync(SNAPSHOT_FILE, "utf8"));
-    console.log(`\n📂 Snapshot encontrado con ${previousMovies.length} películas`);
-    console.log("Previous IDs:", previousMovies.map(m => m.filmId));
+    console.log(`📂 Snapshot encontrado con ${previousMovies.length} películas`);
   } else {
-    console.log("\n⚠️ No se encontró snapshot anterior");
+    console.log("⚠️ No se encontró snapshot anterior");
   }
-
-  console.log("Today IDs:", todayMovies.map(m => m.filmId));
 
   const prevIds = new Set(previousMovies.map(m => m.filmId));
   const todayIds = new Set(todayMovies.map(m => m.filmId));
@@ -130,37 +120,73 @@ async function scrapeImaxMovies() {
   const added = todayMovies.filter(m => !prevIds.has(m.filmId));
   const removed = previousMovies.filter(m => !todayIds.has(m.filmId));
 
-  console.log("\n🆕 Agregadas:", added.map(m => m.title));
+  console.log("🆕 Agregadas:", added.map(m => m.title));
   console.log("❌ Quitadas:", removed.map(m => m.title));
 
   // Guardar snapshot nuevo
   fs.writeFileSync(SNAPSHOT_FILE, JSON.stringify(todayMovies, null, 2));
 
   // =====================
-  // TELEGRAM
+  // TELEGRAM - SIEMPRE ENVÍA
   // =====================
+  let message = "🎬 *Reporte Semanal IMAX - Showcase*\n\n";
+
   if (added.length === 0 && removed.length === 0) {
-    console.log("ℹ️ No hay cambios, no se envía Telegram");
-    return;
-  }
-
-  let message = "🎬 *Cambios en IMAX - Showcase*\n\n";
-
-  if (added.length) {
-    message += "🆕 *Agregadas:*\n";
-    added.forEach(m => {
+    message += "✅ *No hubo cambios en la cartelera*\n\n";
+    message += `📽️ *${todayMovies.length} películas en IMAX:*\n`;
+    todayMovies.forEach(m => {
       message += `• ${m.title}\n`;
     });
-    message += "\n";
+  } else {
+    if (added.length) {
+      message += "🆕 *Agregadas:*\n";
+      added.forEach(m => {
+        message += `• ${m.title}\n`;
+      });
+      message += "\n";
+    }
+
+    if (removed.length) {
+      message += "❌ *Quitadas:*\n";
+      removed.forEach(m => {
+        message += `• ${m.title}\n`;
+      });
+      message += "\n";
+    }
+
+    message += `📽️ *Total: ${todayMovies.length} películas en IMAX*`;
   }
 
-  if (removed.length) {
-    message += "❌ *Quitadas:*\n";
-    removed.forEach(m => {
-      message += `• ${m.title}\n`;
-    });
-  }
-
-  console.log("🚀 Enviando notificación...");
+  console.log("🚀 Enviando reporte semanal...");
   await sendTelegramMessage(message);
 })();
+```
+
+## 📨 Ahora te va a llegar SIEMPRE un mensaje cada jueves:
+
+### Si NO hay cambios:
+```
+🎬 Reporte Semanal IMAX - Showcase
+
+✅ No hubo cambios en la cartelera
+
+📽️ 6 películas en IMAX:
+- Cumbres borrascosas
+- Twenty One Pilots: More Than We Ever Imagined
+- Stray Kids: The dominATE Experience
+- Avatar: fuego y cenizas
+- Una batalla tras otra
+- Pecadores
+```
+
+### Si HAY cambios:
+```
+🎬 Reporte Semanal IMAX - Showcase
+
+🆕 Agregadas:
+- Película Nueva
+
+❌ Quitadas:
+- Película Vieja
+
+📽️ Total: 6 películas en IMAX
