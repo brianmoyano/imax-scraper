@@ -160,33 +160,3 @@ async function scrapeImaxMovies() {
   console.log("🚀 Enviando reporte semanal...");
   await sendTelegramMessage(message);
 })();
-```
-
-## 📨 Ahora te va a llegar SIEMPRE un mensaje cada jueves:
-
-### Si NO hay cambios:
-```
-🎬 Reporte Semanal IMAX - Showcase
-
-✅ No hubo cambios en la cartelera
-
-📽️ 6 películas en IMAX:
-- Cumbres borrascosas
-- Twenty One Pilots: More Than We Ever Imagined
-- Stray Kids: The dominATE Experience
-- Avatar: fuego y cenizas
-- Una batalla tras otra
-- Pecadores
-```
-
-### Si HAY cambios:
-```
-🎬 Reporte Semanal IMAX - Showcase
-
-🆕 Agregadas:
-- Película Nueva
-
-❌ Quitadas:
-- Película Vieja
-
-📽️ Total: 6 películas en IMAX
