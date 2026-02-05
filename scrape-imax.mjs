@@ -1,83 +1,120 @@
 import fs from "fs";
-import { chromium } from "playwright";
+import fetch from "node-fetch";
 
-const SNAPSHOT_FILE = "imax_snapshot.json";
-const URL = "https://www.todoshowcase.com/";
+// =====================
+// ENV
+// =====================
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
-async function getIMAXMovies() {
-  const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage();
-
-  await page.goto(URL, { waitUntil: "networkidle" });
-
-  const movies = await page.evaluate(() => {
-    const results = [];
-    const films = document.querySelectorAll(".boxfilm");
-
-    films.forEach(film => {
-      const imaxTag = film.querySelector(".tresd p");
-      if (!imaxTag) return;
-      if (imaxTag.innerText.trim() !== "IMAX") return;
-
-      const titleEl = film.querySelector(".titulo-pelicula h2 a");
-      const title = titleEl ? titleEl.innerText.trim() : null;
-
-      if (title) {
-        results.push({ title });
-      }
-    });
-
-    return results;
-  });
-
-  await browser.close();
-  return movies;
-}
-
-function loadSnapshot() {
-  if (!fs.existsSync(SNAPSHOT_FILE)) {
-    return [];
-  }
-  return JSON.parse(fs.readFileSync(SNAPSHOT_FILE, "utf-8"));
-}
-
-function saveSnapshot(titles) {
-  fs.writeFileSync(SNAPSHOT_FILE, JSON.stringify(titles, null, 2));
-}
-
-function diffMovies(today, yesterday) {
-  const added = today.filter(t => !yesterday.includes(t));
-  const removed = yesterday.filter(y => !today.includes(y));
-  return { added, removed };
-}
-
-async function main() {
-  // 1️⃣ Scrape
-  const imaxMovies = await getIMAXMovies();
-
-  // 2️⃣ Normalizar
-  const todayTitles = imaxMovies.map(m => m.title).sort();
-  const yesterdayTitles = loadSnapshot();
-
-  // 3️⃣ Comparar
-  const { added, removed } = diffMovies(todayTitles, yesterdayTitles);
-
-  console.log("🎬 Películas IMAX hoy:");
-  todayTitles.forEach(t => console.log(" -", t));
-
-  if (added.length || removed.length) {
-    console.log("🆕 Agregadas:", added);
-    console.log("❌ Quitadas:", removed);
-  } else {
-    console.log("Sin cambios respecto al día anterior");
-  }
-
-  // 4️⃣ Guardar snapshot
-  saveSnapshot(todayTitles);
-}
-
-// 🚀 Ejecutar
-main().catch(err => {
-  console.error("❌ Error en scraper:", err);
+if (!BOT_TOKEN || !CHAT_ID) {
+  console.error("❌ Faltan variables de entorno de Telegram");
   process.exit(1);
-});
+}
+
+// =====================
+// CONFIG
+// =====================
+const SNAPSHOT_FILE = "imax_snapshot.json";
+const IMAX_URL = "https://www.cinemarkhoyts.com.ar/cartelera/imax";
+
+// =====================
+// HELPERS
+// =====================
+function uniqByTitle(movies) {
+  const map = new Map();
+  for (const m of movies) {
+    map.set(m.title, m);
+  }
+  return [...map.values()];
+}
+
+async function sendTelegramMessage(text) {
+  console.log("📨 Enviando mensaje a Telegram...");
+
+  const res = await fetch(
+    `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: CHAT_ID,
+        text,
+        parse_mode: "Markdown",
+      }),
+    }
+  );
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error("Telegram error: " + err);
+  }
+
+  console.log("✅ Mensaje enviado a Telegram");
+}
+
+// =====================
+// SCRAPER (mock simple)
+// =====================
+// ⛔️ ACÁ normalmente iría Playwright
+// ⛔️ dejo mockeado para que el flujo sea claro
+const imaxMovies = [
+  { filmId: "1", title: "Avatar: fuego y cenizas" },
+  { filmId: "2", title: "Cumbres borrascosas" },
+  { filmId: "3", title: "Pecadores" },
+];
+
+// =====================
+// MAIN
+// =====================
+(async () => {
+  console.log("🎬 Películas IMAX hoy:");
+  imaxMovies.forEach(m => console.log(" -", m.title));
+
+  const todayMovies = uniqByTitle(imaxMovies);
+
+  let previousMovies = [];
+  if (fs.existsSync(SNAPSHOT_FILE)) {
+    previousMovies = JSON.parse(fs.readFileSync(SNAPSHOT_FILE, "utf8"));
+  }
+
+  const prevIds = new Set(previousMovies.map(m => m.filmId));
+  const todayIds = new Set(todayMovies.map(m => m.filmId));
+
+  const added = todayMovies.filter(m => !prevIds.has(m.filmId));
+  const removed = previousMovies.filter(m => !todayIds.has(m.filmId));
+
+  console.log("🆕 Agregadas:", added.map(m => m.title));
+  console.log("❌ Quitadas:", removed.map(m => m.title));
+
+  // Guardar snapshot nuevo
+  fs.writeFileSync(SNAPSHOT_FILE, JSON.stringify(todayMovies, null, 2));
+
+  // =====================
+  // TELEGRAM
+  // =====================
+  if (added.length === 0 && removed.length === 0) {
+    console.log("ℹ️ No hay cambios, no se envía Telegram");
+    return;
+  }
+
+  let message = "🎬 *Cambios en IMAX*\n\n";
+
+  if (added.length) {
+    message += "🆕 *Agregadas:*\n";
+    added.forEach(m => {
+      message += `• ${m.title}\n`;
+    });
+    message += "\n";
+  }
+
+  if (removed.length) {
+    message += "❌ *Quitadas:*\n";
+    removed.forEach(m => {
+      message += `• ${m.title}\n`;
+    });
+  }
+
+  console.log("🚀 Voy a mandar Telegram");
+  await sendTelegramMessage(message);
+})();
