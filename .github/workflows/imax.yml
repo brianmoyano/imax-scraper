@@ -6,7 +6,11 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write   # 👈 CLAVE
+  contents: write
+
+concurrency:
+  group: imax-scraper
+  cancel-in-progress: true   # 👈 CLAVE ABSOLUTA
 
 jobs:
   run-scraper:
@@ -17,7 +21,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          persist-credentials: true   # 👈 CLAVE
+          persist-credentials: true
 
       - name: Setup Node
         uses: actions/setup-node@v4
