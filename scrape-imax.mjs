@@ -127,36 +127,33 @@ async function scrapeImaxMovies() {
   fs.writeFileSync(SNAPSHOT_FILE, JSON.stringify(todayMovies, null, 2));
 
   // =====================
-  // TELEGRAM - SIEMPRE ENVÍA
+  // TELEGRAM - SOLO SI HAY CAMBIOS
   // =====================
-  let message = "🎬 *Reporte Semanal IMAX - Showcase*\n\n";
-
   if (added.length === 0 && removed.length === 0) {
-    message += "✅ *No hubo cambios en la cartelera*\n\n";
-    message += `📽️ *${todayMovies.length} películas en IMAX:*\n`;
-    todayMovies.forEach(m => {
-      message += `• ${m.title}\n`;
-    });
-  } else {
-    if (added.length) {
-      message += "🆕 *Agregadas:*\n";
-      added.forEach(m => {
-        message += `• ${m.title}\n`;
-      });
-      message += "\n";
-    }
-
-    if (removed.length) {
-      message += "❌ *Quitadas:*\n";
-      removed.forEach(m => {
-        message += `• ${m.title}\n`;
-      });
-      message += "\n";
-    }
-
-    message += `📽️ *Total: ${todayMovies.length} películas en IMAX*`;
+    console.log("ℹ️ Sin cambios en la cartelera. No se envía mensaje.");
+    return;
   }
 
-  console.log("🚀 Enviando reporte semanal...");
+  let message = "🎬 *Reporte Diario IMAX - Showcase*\n\n";
+
+  if (added.length) {
+    message += "🆕 *Agregadas:*\n";
+    added.forEach(m => {
+      message += `• ${m.title}\n`;
+    });
+    message += "\n";
+  }
+
+  if (removed.length) {
+    message += "❌ *Quitadas:*\n";
+    removed.forEach(m => {
+      message += `• ${m.title}\n`;
+    });
+    message += "\n";
+  }
+
+  message += `📽️ *Total: ${todayMovies.length} películas en IMAX*`;
+
+  console.log("🚀 Enviando reporte diario...");
   await sendTelegramMessage(message);
 })();

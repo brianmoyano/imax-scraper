@@ -2,7 +2,7 @@ name: IMAX Showcase Bot 2
 
 on:
   schedule:
-    - cron: "0 13 * * 4"   # Jueves 10 AM ARG
+    - cron: "0 13 * * *"   # Todos los días 10 AM ARG
   workflow_dispatch:
 
 permissions:
