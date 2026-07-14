@@ -1,0 +1,39 @@
+name: IMAX Film Tracker (La Odisea)
+
+on:
+  schedule:
+    - cron: "0 * * * *"   # Cada hora
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  check-funciones:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Check for new IMAX showtimes
+        run: node check-imax-film.mjs
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+      - name: Commit snapshot changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add imax_5875_funciones.json
+          git diff --quiet && git diff --staged --quiet || git commit -m "Update IMAX film snapshot [skip ci]"
+
+      - name: Push changes
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ github.ref }}
