@@ -1,15 +1,14 @@
 # 🎬 IMAX Showcase Bot
 
-Bot that monitors the **Showcase Argentina** IMAX schedule and sends you a weekly Telegram report with programming changes.
+Bot that monitors the **Showcase Argentina** IMAX schedule (movies, dates and showtimes) and sends you a Telegram alert whenever something changes.
 
 ## 📋 What does it do?
 
-- 🔍 Scrapes the [Showcase](https://www.todoshowcase.com/) page every Thursday at 10 AM (Argentina time)
-- 📊 Detects movies added or removed from the IMAX schedule
-- 📨 Sends you a weekly Telegram report with:
-  - ✅ New movies in IMAX
-  - ❌ Movies that were removed
-  - 📽️ Complete list of current movies (if there are no changes)
+- 🌐 Queries the undocumented [voyalcine](https://api.voyalcine.net) JSON API that powers the Showcase ticketing site every 30 minutes — no browser/scraping involved
+- 📊 Detects:
+  - 🆕 Movies added to or ❌ removed from the IMAX lineup
+  - 🕐 New dates or showtimes added for movies already tracked
+- 📨 Sends a Telegram message **only when something actually changed** — silent otherwise
 
 ## 🚀 Installation
 
@@ -44,78 +43,66 @@ Bot that monitors the **Showcase Argentina** IMAX schedule and sends you a weekl
 1. Go to the **Actions** tab of your fork
 2. Click on **"I understand my workflows, go ahead and enable them"**
 
-Done! The bot will run automatically every Thursday at 10 AM 🇦🇷
+Done! The bot will run automatically every 30 minutes 🇦🇷
 
 ## 🧪 Test it manually
 
-1. Go to **Actions** → **IMAX Showcase Bot 2**
+1. Go to **Actions** → **IMAX Showcase Bot**
 2. Click on **Run workflow** → **Run workflow**
-3. You should receive a message on Telegram in less than 1 minute
+3. If there are changes since the last run, you'll get a Telegram message in a few seconds
 
 ## 📁 Project Structure
 ```
 imax-scraper/
 ├── .github/
 │   └── workflows/
-│       └── scrape.yml          # Cron job configuration
-├── scrape-imax.mjs             # Main script
-├── package.json                # Dependencies
-├── imax_snapshot.json          # Movie snapshot (auto-generated)
+│       └── imax-bot.yml        # Cron job configuration (every 30 min)
+├── check-imax.mjs              # Main script
+├── package.json
+├── imax_estado.json            # IMAX state snapshot (auto-generated)
 └── README.md
 ```
 
 ## 📨 Message Example
 
-### No changes:
+Only sent when something changes — silent otherwise:
 ```
-🎬 Weekly IMAX Report - Showcase
+🎬 IMAX Showcase - Actualización
 
-✅ No changes in the schedule
+🆕 Nuevas películas en IMAX:
+• Dune: Part Three
 
-📽️ 6 movies in IMAX:
-- Wuthering Heights
-- Twenty One Pilots: More Than We Ever Imagined
-- Stray Kids: The dominATE Experience
-- Avatar: Fire and Ash
-- One Fight After Another
-- Sinners
-```
+❌ Salieron de IMAX:
+• Sinners
 
-### With changes:
-```
-🎬 Weekly IMAX Report - Showcase
-
-🆕 Added:
-- Dune: Part Three
-
-❌ Removed:
-- Sinners
-
-📽️ Total: 6 movies in IMAX
+🕐 Nuevas funciones:
+*La Odisea*
+  • 05/08/2026: 15:25, 19:00, 22:35
+  • 16/07/2026: 22:35 (horario nuevo)
 ```
 
 ## ⚙️ Configuration
 
-### Change the schedule
+### Change the frequency
 
-Edit `.github/workflows/scrape.yml`:
+Edit `.github/workflows/imax-bot.yml`:
 ```yaml
 schedule:
-  - cron: "0 13 * * 4"   # Thursday 10 AM ARG
+  - cron: "*/30 * * * *"   # Every 30 minutes
 ```
 
 Examples:
-- Every day 9 AM ARG: `"0 12 * * *"`
-- Monday and Friday 8 AM ARG: `"0 11 * * 1,5"`
+- Every hour: `"0 * * * *"`
+- Every day at 9 AM ARG: `"0 12 * * *"`
 
-### Change frequency
+### Track a different IMAX theatre
 
-The bot currently runs **once a week (Thursday)**. To change the frequency, modify the `cron` in the workflow.
+`check-imax.mjs` hardcodes `IMAX_HOUSE_ID = 3250`, the ewaveId for IMAX Theatre (Norcenter) — currently the only IMAX screen in the Showcase Argentina circuit. If that changes, find the new theatre's ewaveId by requesting `https://api.voyalcine.net/films/{any_film_id}/tree` (no house filter) and looking for the entry with `formatDescription` containing `IMAX`.
 
 ## 🛠️ Technologies
 
-- **Node.js 18** - Runtime
-- **Playwright** - Web scraping
+- **Node.js 18** - Runtime (plain `fetch`, no dependencies)
+- **voyalcine JSON API** - Same backend the ticketing site itself calls, no scraping
 - **GitHub Actions** - Automation
 - **Telegram Bot API** - Notifications
 
@@ -124,6 +111,7 @@ The bot currently runs **once a week (Thursday)**. To change the frequency, modi
 - The bot only tracks movies in **IMAX** format
 - The snapshot is automatically saved in the repository
 - No server required - runs 100% on GitHub Actions (free)
+- On the very first run there's no previous snapshot to compare against, so it just saves the baseline silently — no message
 
 ## 🐛 Troubleshooting
 
@@ -131,10 +119,7 @@ The bot currently runs **once a week (Thursday)**. To change the frequency, modi
 - Verify that the secrets are configured correctly
 - Make sure you've sent at least one message to your bot
 - Check the logs in **Actions** to see if there are any errors
-
-### The bot says all movies are new
-- This is normal the first time it runs
-- From the second execution onwards it should work correctly
+- If nothing has actually changed in the IMAX lineup, that's expected — the bot stays silent
 
 ## 📄 License
 

@@ -1,15 +1,15 @@
-name: IMAX Showcase Bot 2
+name: IMAX Showcase Bot
 
 on:
   schedule:
-    - cron: "0 13 * * *"   # Todos los días 10 AM ARG
+    - cron: "*/30 * * * *"   # Cada 30 minutos, todos los días
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  run-scraper:
+  check-imax:
     runs-on: ubuntu-latest
 
     steps:
@@ -19,14 +19,8 @@ jobs:
         with:
           node-version: 18
 
-      - name: Install dependencies
-        run: npm install
-
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps
-
-      - name: Run IMAX scraper
-        run: node scrape-imax.mjs
+      - name: Check IMAX lineup and showtimes
+        run: node check-imax.mjs
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -35,7 +29,7 @@ jobs:
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add imax_snapshot.json
+          git add imax_estado.json
           git diff --quiet && git diff --staged --quiet || git commit -m "Update IMAX snapshot [skip ci]"
 
       - name: Push changes
